@@ -59,6 +59,9 @@ namespace session {
 	stUser currentUser;
 }
 
+static std::string getTimeNow();
+void appendToFile(const std::string& line, const std::string& fileName);
+
 // ============= Check permissions =============
 bool isAllowed(int choice)
 {
@@ -614,6 +617,17 @@ static std::string getTimeNow()
 		return oss.str();
 }
 
+void writeAuditLog(const std::string& action, const std::string& target, const std::string& result, const std::string& details)
+{
+	std::string user = "unknown";
+	if (!session::currentUser.username.empty())
+		user = session::currentUser.username;
+
+	std::string line = getTimeNow() + "#//#" + user + "#//#" + action + "#//#" + target + "#//#" + result + "#//#" + details;
+
+	appendToFile(line, config::loggingFile);
+}
+
 // ==================== Bank Operations ====================
 
 // | - Client - |
@@ -622,10 +636,16 @@ void listAllClients(const std::vector<stClient>& clients)
 	system("cls");
 
 	if (isAllowed(config::stPermisions::LIST))
+	{
 		printTableOfClients(clients);
+		writeAuditLog("LIST_CLIENTS", "CLIENT:ALL", "SUCCESS", std::string("count=") + std::to_string(clients.size()));
+	}
 	else
+	{
 		printAccessIsDenied();
-	
+		writeAuditLog("LIST_CLIENTS", "CLIENT:ALL", "DENIED", "NO_PERMISSION");
+	}
+
 	std::cout << "Press any key to return main menu....";
 	system("pause>0");
 
@@ -679,6 +699,7 @@ void listAllUsers(const std::vector<stUser>& users)
 	system("cls");
 
 	printTableOfUsers(users);
+	writeAuditLog("LIST_USERS", "USER:ALL", "SUCCESS", std::string("count=") + std::to_string(users.size()));
 
 	std::cout << "Press any key to return management user menu . . . ";
 	system("pause>0");
@@ -747,12 +768,16 @@ void runAddClient(const std::vector<stClient>& clients)
 		stClient newClient = readNewClient(clients);
 		addNewClient(newClient);
 
+		writeAuditLog("ADD_CLIENT", std::string("CLIENT:") + newClient.accNumber, "SUCCESS",
+			std::string("name=") + newClient.name + ";phone=" + newClient.phoneNumber + ";balance=" + std::to_string((double)newClient.balance));
+
 		std::cout << "\nClient added succefully! - press any key to return the main menu . . . ";
 
 	}
 	else
 	{
 		printAccessIsDenied();
+		writeAuditLog("ADD_CLIENT", "CLIENT:ALL", "DENIED", "NO_PERMISSION");
 		std::cout << "\npress any key to return the main menu . . . ";
 	}
 
@@ -772,9 +797,13 @@ void runFindClient(const std::vector<stClient>& clients)
 
 		int clientIndex = checkClientIsThere(clients);
 		printClientCard(clients[clientIndex - 1]);
+		writeAuditLog("FIND_CLIENT", std::string("CLIENT:") + clients[clientIndex - 1].accNumber, "SUCCESS", "");
 	}
 	else
+	{
 		printAccessIsDenied();
+		writeAuditLog("FIND_CLIENT", "CLIENT:ALL", "DENIED", "NO_PERMISSION");
+	}
 
 
 	std::cout << "\n\nPress any key to return main menu . . . ";
@@ -800,13 +829,18 @@ void runDeleteClient(std::vector<stClient>& clients)
 
 		if (wantToDelete == 'y' || wantToDelete == 'Y')
 		{
+			std::string acc = clients[clientIndex - 1].accNumber;
 			deleteClient(clients, clientIndex - 1);
 			saveClientsInFile(clients);
+			writeAuditLog("DELETE_CLIENT", std::string("CLIENT:") + acc, "SUCCESS", "");
 			std::cout << "\nClient deleted successfully!";
 		}
 	}
 	else
+	{
 		printAccessIsDenied();
+		writeAuditLog("DELETE_CLIENT", "CLIENT:ALL", "DENIED", "NO_PERMISSION");
+	}
 
 	std::cout << "\nPress any key to return main menu . . . ";
 	system("pause>0");
@@ -834,11 +868,16 @@ void runUpdateClient(std::vector<stClient>& clients)
 		{
 			updateClient(clients, clientIndex - 1);
 			saveClientsInFile(clients);
+			writeAuditLog("UPDATE_CLIENT", std::string("CLIENT:") + clients[clientIndex - 1].accNumber, "SUCCESS",
+				std::string("name=") + clients[clientIndex - 1].name + ";phone=" + clients[clientIndex - 1].phoneNumber + ";balance=" + std::to_string((double)clients[clientIndex - 1].balance) + ";pin=" + std::to_string(clients[clientIndex - 1].pin));
 			std::cout << "\n\nClient Updated successfully!";
 		}
 	}
 	else
+	{
 		printAccessIsDenied();
+		writeAuditLog("UPDATE_CLIENT", "CLIENT:ALL", "DENIED", "NO_PERMISSION");
+	}
 
 	std::cout << "\nPress any key to return main menu . . . ";
 	system("pause>0");
@@ -866,6 +905,8 @@ void runDeposite(std::vector<stClient>& clients)
 	{
 		amount = readBalance("\nEnter the amount to deposite");
 		deposite(clients, clientIndex - 1, amount);
+		writeAuditLog("DEPOSIT", std::string("CLIENT:") + clients[clientIndex - 1].accNumber, "SUCCESS",
+			std::string("amount=") + std::to_string(amount) + ";balance_after=" + std::to_string((double)clients[clientIndex - 1].balance));
 		std::cout << "\nThe amount deposited succefully!" << std::endl;
 	}
 
@@ -895,11 +936,15 @@ void runWithdraw(std::vector<stClient>& clients)
 
 		while (amount > clients[clientIndex - 1].balance)
 		{
+			writeAuditLog("WITHDRAW", std::string("CLIENT:") + clients[clientIndex - 1].accNumber, "FAILED",
+				std::string("INSUFFICIENT_FUNDS;balance=") + std::to_string((double)clients[clientIndex - 1].balance) + ";requested=" + std::to_string(amount));
 			std::cout << "\nNot enough amount!, please try again . . . " << std::endl;
 			amount = readBalance("\nEnter the amount to withdraw");
 		}
 
 		withdraw(clients, clientIndex - 1, amount);
+		writeAuditLog("WITHDRAW", std::string("CLIENT:") + clients[clientIndex - 1].accNumber, "SUCCESS",
+			std::string("amount=") + std::to_string(amount) + ";balance_after=" + std::to_string((double)clients[clientIndex - 1].balance));
 		std::cout << "\nThe amount withdrawed succefully!" << std::endl;
 	}
 
@@ -942,6 +987,9 @@ void runAddUser(const std::vector<stUser>& users)
 	stUser newUser = readNewUser(users);
 	addNewUser(newUser);
 
+	writeAuditLog("ADD_USER", std::string("USER:") + newUser.username, "SUCCESS",
+		std::string("permissions=") + std::to_string(newUser.permissions));
+
 	std::cout << "\nUser added succefully! - press any key to return the management users menu . . . ";
 	system("pause>0");
 
@@ -956,6 +1004,7 @@ void runFindUser(const std::vector<stUser>& users)
 
 	int userIndex = checkUserIsThere(users);
 	printUserCard(users[userIndex - 1]);
+	writeAuditLog("FIND_USER", std::string("USER:") + users[userIndex - 1].username, "SUCCESS", "");
 
 	std::cout << "\n\nPress any key to return management users menu . . . ";
 	system("pause>0");
@@ -982,15 +1031,18 @@ void runDeleteUser(std::vector<stUser>& users)
 
 		if (wantToDelete == 'y' || wantToDelete == 'Y')
 		{
-			deleteUser(users, userIndex - 1);
-			saveUsersInFile(users);
-			std::cout << "\nUser deleted successfully!";
+				std::string uname = users[userIndex - 1].username;
+				deleteUser(users, userIndex - 1);
+				saveUsersInFile(users);
+				writeAuditLog("DELETE_USER", std::string("USER:") + uname, "SUCCESS", "");
+				std::cout << "\nUser deleted successfully!";
 		}
 
 	}
 	else
 	{
 		std::cout << "\nYou can't delete this user!" << std::endl;
+		writeAuditLog("DELETE_USER", std::string("USER:") + users[userIndex - 1].username, "DENIED", "CANNOT_DELETE_SUPERUSER");
 	}
 
 	std::cout << "\nPress any key to return management users menu . . . ";
@@ -1017,6 +1069,8 @@ void runUpdateUser(std::vector<stUser>& users)
 	{
 		updateUser(users, userIndex - 1);
 		saveUsersInFile(users);
+		writeAuditLog("UPDATE_USER", std::string("USER:") + users[userIndex - 1].username, "SUCCESS",
+			std::string("permissions=") + std::to_string(users[userIndex - 1].permissions));
 		std::cout << "\n\User Updated successfully!";
 	}
 
@@ -1051,16 +1105,22 @@ void login()
 		if (userIndex)
 		{
 			session::currentUser = users[userIndex - 1];
+			writeAuditLog("LOGIN", "SYSTEM", "SUCCESS", std::string("username=") + session::currentUser.username);
 			clientControler();
+			return;
 		}
 
 		std::cout << "\nInvalid Username/Password, Please try again . . . \n\n";
+		writeAuditLog("LOGIN_FAILED", "SYSTEM", "FAILED", "INVALID_CREDENTIALS");
 	}
 }
 
 void logout()
 {
-	login();
+    writeAuditLog("LOGOUT", "SYSTEM", "SUCCESS", std::string("username=") + (session::currentUser.username.empty() ? "unknown" : session::currentUser.username));
+    // clear current user
+    session::currentUser = stUser{};
+    login();
 }
 
 // ================== Operations Controlers ==================
@@ -1098,6 +1158,7 @@ void clientControler()
 		{
 			system("cls");
 			printAccessIsDenied();
+			writeAuditLog("TRANSACTIONS", "CLIENT:ALL", "DENIED", "NO_PERMISSION");
 			std::cout << "\n\nPress any key to return main menu . . . ";
 			system("pause>0");
 			clientControler();
@@ -1110,6 +1171,7 @@ void clientControler()
 		{
 			system("cls");
 			printAccessIsDenied();
+			writeAuditLog("MANAGE_USERS", "USER:ALL", "DENIED", "NO_PERMISSION");
 			std::cout << "\n\nPress any key to return main menu . . . ";
 			system("pause>0");
 			clientControler();

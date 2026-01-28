@@ -1,0 +1,4 @@
+2026-01-28 23:57:41#//#unknown#//#LOGIN_FAILED#//#SYSTEM#//#FAILED#//#INVALID_CREDENTIALS
+2026-01-28 23:57:47#//#admin#//#LOGIN#//#SYSTEM#//#SUCCESS#//#username=admin
+2026-01-28 23:57:48#//#admin#//#LIST_CLIENTS#//#CLIENT:ALL#//#SUCCESS#//#count=5
+2026-01-28 23:57:57#//#admin#//#ADD_CLIENT#//#CLIENT:D975#//#SUCCESS#//#name=hamza;phone=01552132061;balance=1500.000000
