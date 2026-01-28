@@ -51,10 +51,23 @@ The project is built without external frameworks, relying purely on **C++ and ST
 
 ---
 
-### 🧾 Logging & Time Handling
+## 🧾 Logging & Time Handling
+
 - Centralized date-time generation using `std::chrono`
-- Timestamp-ready logging system
-- Cross-platform time formatting (Windows / Linux)
+- Unified audit logging system that records **every critical system action**
+- Structured log format for easy parsing and analysis
+- Cross-platform time handling and formatting  
+  *(Windows: `localtime_s`, Linux: `localtime_r`)*
+- Full audit trail support for:
+  - Authentication attempts (login / logout / failed login)
+  - Permission denials
+  - Client operations
+  - User management actions
+  - Financial transactions (deposit / withdraw)
+- Designed to be easily extendable for:
+  - Database-backed logging
+  - External monitoring tools
+  - Security audits and compliance checks
 
 ---
 
